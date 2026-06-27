@@ -47,10 +47,10 @@ assert.deepEqual(
   extractInitialStateAlbumUrls('<img src="//i0.hdslb.com/bfs/new_dyn/thumb.jpg@80w_80h_1c">'),
   []
 );
-assert.equal(shouldRebuildButton(undefined, '7.1.9'), true);
-assert.equal(shouldRebuildButton('', '7.1.9'), true);
-assert.equal(shouldRebuildButton('7.1.8', '7.1.9'), true);
-assert.equal(shouldRebuildButton('7.1.9', '7.1.9'), false);
+assert.equal(shouldRebuildButton(undefined, '7.2.0'), true);
+assert.equal(shouldRebuildButton('', '7.2.0'), true);
+assert.equal(shouldRebuildButton('7.1.9', '7.2.0'), true);
+assert.equal(shouldRebuildButton('7.2.0', '7.2.0'), false);
 assert.equal(crc32(new TextEncoder().encode('hello')), 0x3610a686);
 
 (async () => {

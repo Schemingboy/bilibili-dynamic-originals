@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.9
+// @version      7.2.0
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
 // @match        https://www.bilibili.com/opus/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_download
 // @connect      hdslb.com
 // @connect      *.hdslb.com
 // @connect      i0.hdslb.com
@@ -23,7 +24,7 @@
   const BUTTON_ID = 'bili-originals-fixed-button';
   const LINK_ID = 'bili-originals-download-link';
   const STYLE_ID = 'bili-originals-style';
-  const SCRIPT_VERSION = '7.1.9';
+  const SCRIPT_VERSION = '7.2.0';
   const DETAIL_SELECTORS = [
     '.opus-detail',
     '.opus-module-content',
@@ -293,6 +294,19 @@
     if (color) button.style.background = color;
   }
 
+  function triggerDownload(url, filename, link) {
+    if (typeof GM_download === 'function') {
+      GM_download({
+        url,
+        name: filename,
+        saveAs: false,
+        onerror: () => link.click()
+      });
+      return;
+    }
+    link.click();
+  }
+
   function showDownloadLink(blob, filename) {
     const existing = document.getElementById(LINK_ID);
     if (existing) {
@@ -306,7 +320,7 @@
     link.download = filename;
     link.textContent = '保存 ZIP';
     document.body.appendChild(link);
-    link.click();
+    triggerDownload(link.href, filename, link);
   }
 
   async function downloadZip(root, button) {
