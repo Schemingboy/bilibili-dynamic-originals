@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.2
+// @version      7.1.3
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -22,6 +22,7 @@
   'use strict';
 
   const BUTTON_ID = 'bili-originals-fixed-button';
+  const LINK_ID = 'bili-originals-download-link';
   const STYLE_ID = 'bili-originals-style';
   const DETAIL_SELECTORS = [
     '.opus-detail',
@@ -125,6 +126,21 @@
         background: #0098d1;
       }
 
+      #${LINK_ID} {
+        position: fixed;
+        right: 32px;
+        bottom: 68px;
+        z-index: 999999;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: #18a058;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+      }
+
       #${BUTTON_ID} {
         position: fixed;
         right: 32px;
@@ -212,6 +228,22 @@
     if (color) button.style.background = color;
   }
 
+  function showDownloadLink(blob, filename) {
+    const existing = document.getElementById(LINK_ID);
+    if (existing) {
+      URL.revokeObjectURL(existing.href);
+      existing.remove();
+    }
+
+    const link = document.createElement('a');
+    link.id = LINK_ID;
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.textContent = '保存 ZIP';
+    document.body.appendChild(link);
+    link.click();
+  }
+
   async function downloadZip(root, button) {
     if (button.dataset.loading === '1') return;
 
@@ -245,16 +277,12 @@
         zip.file('failed-urls.txt', failedUrls.join('\n'));
       }
 
-      setButtonState(button, '打包中', '#fa8c16');
-      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = href;
-      link.download = `bilibili-dynamic-${getDynamicId(root)}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 10000);
+      setButtonState(button, '打包 0%', '#fa8c16');
+      const blob = await zip.generateAsync(
+        { type: 'blob', compression: 'STORE' },
+        (metadata) => setButtonState(button, `打包 ${Math.floor(metadata.percent)}%`, '#fa8c16')
+      );
+      showDownloadLink(blob, `bilibili-dynamic-${getDynamicId(root)}.zip`);
 
       setButtonState(button, failedUrls.length ? `完成 ${urls.length - failedUrls.length}/${urls.length}` : '完成', '#18a058');
     } catch (error) {
