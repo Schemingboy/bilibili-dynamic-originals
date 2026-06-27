@@ -5,7 +5,8 @@ const {
   extractInitialStateAlbumUrls,
   extractUrlsFromText,
   imageExtension,
-  isContentImageUrl
+  isContentImageUrl,
+  shouldRebuildButton
 } = require('../bilibili-dynamic-originals.user.js');
 
 assert.equal(
@@ -44,5 +45,9 @@ assert.deepEqual(
   extractInitialStateAlbumUrls('<img src="//i0.hdslb.com/bfs/new_dyn/thumb.jpg@80w_80h_1c">'),
   []
 );
+assert.equal(shouldRebuildButton(undefined, '7.1.8'), true);
+assert.equal(shouldRebuildButton('', '7.1.8'), true);
+assert.equal(shouldRebuildButton('7.1.7', '7.1.8'), true);
+assert.equal(shouldRebuildButton('7.1.8', '7.1.8'), false);
 
 console.log('self-check ok');

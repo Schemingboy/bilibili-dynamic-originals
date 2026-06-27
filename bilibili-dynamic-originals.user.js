@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.7
+// @version      7.1.8
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -24,6 +24,7 @@
   const BUTTON_ID = 'bili-originals-fixed-button';
   const LINK_ID = 'bili-originals-download-link';
   const STYLE_ID = 'bili-originals-style';
+  const SCRIPT_VERSION = '7.1.8';
   const DETAIL_SELECTORS = [
     '.opus-detail',
     '.opus-module-content',
@@ -100,8 +101,12 @@
     }
   }
 
+  function shouldRebuildButton(existingVersion, currentVersion) {
+    return existingVersion !== currentVersion;
+  }
+
   if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-    module.exports = { cleanImageUrl, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl };
+    module.exports = { cleanImageUrl, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl, shouldRebuildButton };
     return;
   }
 
@@ -313,10 +318,13 @@
       return;
     }
 
+    if (existing && !shouldRebuildButton(existing.dataset.version, SCRIPT_VERSION)) return;
     if (existing) existing.remove();
     const button = document.createElement('button');
     button.id = BUTTON_ID;
     button.type = 'button';
+    button.dataset.version = SCRIPT_VERSION;
+    button.title = `Bilibili 动态原图打包下载 v${SCRIPT_VERSION}`;
     button.textContent = '下载原图 ZIP';
     button.addEventListener('click', () => downloadZip(findDetailRoot(), button));
     document.body.appendChild(button);
