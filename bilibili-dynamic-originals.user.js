@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.3
+// @version      7.1.7
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -277,11 +277,8 @@
         zip.file('failed-urls.txt', failedUrls.join('\n'));
       }
 
-      setButtonState(button, '打包 0%', '#fa8c16');
-      const blob = await zip.generateAsync(
-        { type: 'blob', compression: 'STORE' },
-        (metadata) => setButtonState(button, `打包 ${Math.floor(metadata.percent)}%`, '#fa8c16')
-      );
+      setButtonState(button, '生成 ZIP', '#fa8c16');
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', streamFiles: true });
       showDownloadLink(blob, `bilibili-dynamic-${getDynamicId(root)}.zip`);
 
       setButtonState(button, failedUrls.length ? `完成 ${urls.length - failedUrls.length}/${urls.length}` : '完成', '#18a058');
@@ -316,7 +313,7 @@
       return;
     }
 
-    if (existing) return;
+    if (existing) existing.remove();
     const button = document.createElement('button');
     button.id = BUTTON_ID;
     button.type = 'button';
