@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.1
+// @version      7.1.2
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -230,9 +230,19 @@
       }
 
       const zip = new JSZip();
+      const failedUrls = [];
       for (let index = 0; index < urls.length; index += 1) {
         setButtonState(button, `${index + 1}/${urls.length}`, '#f69');
-        zip.file(`${String(index + 1).padStart(2, '0')}.${imageExtension(urls[index])}`, await requestBuffer(urls[index]));
+        try {
+          zip.file(`${String(index + 1).padStart(2, '0')}.${imageExtension(urls[index])}`, await requestBuffer(urls[index]));
+        } catch (error) {
+          console.error('[bilibili-originals] image download failed', urls[index], error);
+          failedUrls.push(urls[index]);
+        }
+      }
+
+      if (failedUrls.length) {
+        zip.file('failed-urls.txt', failedUrls.join('\n'));
       }
 
       setButtonState(button, '打包中', '#fa8c16');
@@ -246,7 +256,7 @@
       link.remove();
       setTimeout(() => URL.revokeObjectURL(href), 10000);
 
-      setButtonState(button, '完成', '#18a058');
+      setButtonState(button, failedUrls.length ? `完成 ${urls.length - failedUrls.length}/${urls.length}` : '完成', '#18a058');
     } catch (error) {
       console.error('[bilibili-originals]', error);
       setButtonState(button, `失败: ${error.message}`, '#d03050');
