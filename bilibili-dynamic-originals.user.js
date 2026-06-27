@@ -56,9 +56,9 @@
     if (!/(^|\.)hdslb\.com$|(^|\.)biliimg\.com$/.test(host)) return false;
     if (!path.includes('/bfs/')) return false;
     if (!/\.(jpe?g|png|webp|gif|avif)$/.test(path)) return false;
-    if (/\/bfs\/(face|emote|garb|space|account|wbi)\//.test(path)) return false;
+    if (/\/bfs\/(face|emote|garb|space|account|wbi|static|vip|activity-plat)\//.test(path)) return false;
 
-    return true;
+    return /\/bfs\/(new_dyn|article|album|dynamic|creative_common)\//.test(path);
   }
 
   function imageExtension(url) {

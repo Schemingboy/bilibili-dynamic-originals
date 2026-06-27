@@ -13,6 +13,8 @@ assert.equal(
 );
 assert.equal(isContentImageUrl('https://i0.hdslb.com/bfs/new_dyn/demo.png'), true);
 assert.equal(isContentImageUrl('https://i0.hdslb.com/bfs/face/avatar.jpg'), false);
+assert.equal(isContentImageUrl('https://i0.hdslb.com/bfs/static/jinkela/video/asserts/22-coin-ani.png'), false);
+assert.equal(isContentImageUrl('https://i0.hdslb.com/bfs/vip/label_annual.png'), false);
 assert.deepEqual(
   dedupeUrls([
     'https://i0.hdslb.com/bfs/article/a.jpeg@100w',

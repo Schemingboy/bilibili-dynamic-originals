@@ -6,6 +6,7 @@
 
 - `bilibili-dynamic-originals.user.js`：唯一可安装的 Tampermonkey 脚本源文件。
 - `checks/`：放最小可运行检查，只验证脚本里的关键纯函数。
+- `exports/`：放临时导出的 ZIP 和图片缓存，不提交到 Git。
 - `新建 文本文档.txt`：旧脚本备份，不再作为可安装版本维护。
 
 ## 修改原则
