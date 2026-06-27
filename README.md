@@ -10,7 +10,7 @@ Tampermonkey 脚本：打开单条 Bilibili 动态详情页后，一键下载本
 ## 使用
 
 1. 安装 Tampermonkey。
-2. 新建脚本，粘贴 `bilibili-dynamic-originals.user.js` 的内容。
+2. 新建脚本，复制 `bilibili-dynamic-originals.user.js` 的内容。
 3. 打开单条动态详情页，点击右下角 `下载原图 ZIP`。
 
 ## 检查
