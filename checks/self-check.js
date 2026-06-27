@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const {
   cleanImageUrl,
+  createZipBlob,
+  crc32,
   dedupeUrls,
   extractInitialStateAlbumUrls,
   extractUrlsFromText,
@@ -45,9 +47,18 @@ assert.deepEqual(
   extractInitialStateAlbumUrls('<img src="//i0.hdslb.com/bfs/new_dyn/thumb.jpg@80w_80h_1c">'),
   []
 );
-assert.equal(shouldRebuildButton(undefined, '7.1.8'), true);
-assert.equal(shouldRebuildButton('', '7.1.8'), true);
-assert.equal(shouldRebuildButton('7.1.7', '7.1.8'), true);
-assert.equal(shouldRebuildButton('7.1.8', '7.1.8'), false);
+assert.equal(shouldRebuildButton(undefined, '7.1.9'), true);
+assert.equal(shouldRebuildButton('', '7.1.9'), true);
+assert.equal(shouldRebuildButton('7.1.8', '7.1.9'), true);
+assert.equal(shouldRebuildButton('7.1.9', '7.1.9'), false);
+assert.equal(crc32(new TextEncoder().encode('hello')), 0x3610a686);
 
-console.log('self-check ok');
+(async () => {
+  const blob = createZipBlob([{ name: 'hello.txt', data: new TextEncoder().encode('hello') }]);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const text = new TextDecoder().decode(bytes);
+  assert.equal(bytes[0], 0x50);
+  assert.equal(bytes[1], 0x4b);
+  assert.equal(text.includes('hello.txt'), true);
+  console.log('self-check ok');
+})();

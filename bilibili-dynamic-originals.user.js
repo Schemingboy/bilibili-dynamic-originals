@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.8
+// @version      7.1.9
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
 // @match        https://www.bilibili.com/opus/*
-// @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
 // @grant        GM_xmlhttpRequest
 // @connect      hdslb.com
 // @connect      *.hdslb.com
@@ -24,7 +23,7 @@
   const BUTTON_ID = 'bili-originals-fixed-button';
   const LINK_ID = 'bili-originals-download-link';
   const STYLE_ID = 'bili-originals-style';
-  const SCRIPT_VERSION = '7.1.8';
+  const SCRIPT_VERSION = '7.1.9';
   const DETAIL_SELECTORS = [
     '.opus-detail',
     '.opus-module-content',
@@ -105,8 +104,69 @@
     return existingVersion !== currentVersion;
   }
 
+  const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    return value >>> 0;
+  });
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function u16(value) {
+    return [value & 0xff, (value >>> 8) & 0xff];
+  }
+
+  function u32(value) {
+    return [value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff];
+  }
+
+  function textBytes(text) {
+    return Array.from(new TextEncoder().encode(text));
+  }
+
+  function createZipBlob(files) {
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+
+    for (const file of files) {
+      const name = textBytes(file.name);
+      const data = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
+      const crc = crc32(data);
+      const local = [
+        ...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0),
+        ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...name
+      ];
+
+      chunks.push(new Uint8Array(local), data);
+      central.push(new Uint8Array([
+        ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0),
+        ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...u16(0),
+        ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...name
+      ]));
+      offset += local.length + data.length;
+    }
+
+    const centralOffset = offset;
+    let centralSize = 0;
+    for (const record of central) {
+      chunks.push(record);
+      centralSize += record.length;
+    }
+
+    chunks.push(new Uint8Array([
+      ...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length),
+      ...u32(centralSize), ...u32(centralOffset), ...u16(0)
+    ]));
+    return new Blob(chunks, { type: 'application/zip' });
+  }
+
   if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-    module.exports = { cleanImageUrl, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl, shouldRebuildButton };
+    module.exports = { cleanImageUrl, createZipBlob, crc32, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl, shouldRebuildButton };
     return;
   }
 
@@ -266,12 +326,15 @@
         return;
       }
 
-      const zip = new JSZip();
+      const files = [];
       const failedUrls = [];
       for (let index = 0; index < urls.length; index += 1) {
         setButtonState(button, `${index + 1}/${urls.length}`, '#f69');
         try {
-          zip.file(`${String(index + 1).padStart(2, '0')}.${imageExtension(urls[index])}`, await requestBuffer(urls[index]));
+          files.push({
+            name: `${String(index + 1).padStart(2, '0')}.${imageExtension(urls[index])}`,
+            data: new Uint8Array(await requestBuffer(urls[index]))
+          });
         } catch (error) {
           console.error('[bilibili-originals] image download failed', urls[index], error);
           failedUrls.push(urls[index]);
@@ -279,11 +342,11 @@
       }
 
       if (failedUrls.length) {
-        zip.file('failed-urls.txt', failedUrls.join('\n'));
+        files.push({ name: 'failed-urls.txt', data: new TextEncoder().encode(failedUrls.join('\n')) });
       }
 
       setButtonState(button, '生成 ZIP', '#fa8c16');
-      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', streamFiles: true });
+      const blob = createZipBlob(files);
       showDownloadLink(blob, `bilibili-dynamic-${getDynamicId(root)}.zip`);
 
       setButtonState(button, failedUrls.length ? `完成 ${urls.length - failedUrls.length}/${urls.length}` : '完成', '#18a058');
