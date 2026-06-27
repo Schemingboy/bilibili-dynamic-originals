@@ -2,18 +2,16 @@
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
 // @version      7.1.0
-// @description  在 Bilibili 单条动态/opus 页面或动态列表卡片中，一键把本条动态图片原图打包为 ZIP。
+// @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
 // @match        https://www.bilibili.com/opus/*
-// @match        https://space.bilibili.com/*/dynamic*
 // @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
 // @grant        GM_xmlhttpRequest
 // @connect      hdslb.com
 // @connect      *.hdslb.com
 // @connect      biliimg.com
 // @connect      *.biliimg.com
-// @connect      api.bilibili.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -21,9 +19,7 @@
   'use strict';
 
   const BUTTON_ID = 'bili-originals-fixed-button';
-  const BUTTON_CLASS = 'bili-originals-card-button';
   const STYLE_ID = 'bili-originals-style';
-  const DETAIL_API = 'https://api.bilibili.com/x/polymer/web-dynamic/v1/detail';
   const DETAIL_SELECTORS = [
     '.opus-detail',
     '.opus-module-content',
@@ -31,13 +27,6 @@
     '.bili-dyn-card',
     'main',
     '#app'
-  ];
-  const CARD_SELECTORS = [
-    '.bili-dyn-list__item',
-    '.bili-dyn-item',
-    '.bili-dyn-card',
-    '.opus-card',
-    'article'
   ];
 
   function cleanImageUrl(value) {
@@ -98,8 +87,7 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${BUTTON_ID},
-      .${BUTTON_CLASS} {
+      #${BUTTON_ID} {
         border: 0;
         background: #00aeec;
         color: #fff;
@@ -110,8 +98,7 @@
         box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
       }
 
-      #${BUTTON_ID}:hover,
-      .${BUTTON_CLASS}:hover {
+      #${BUTTON_ID}:hover {
         background: #0098d1;
       }
 
@@ -123,15 +110,6 @@
         min-width: 112px;
         padding: 12px 16px;
         border-radius: 999px;
-      }
-
-      .${BUTTON_CLASS} {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 50;
-        padding: 8px 10px;
-        border-radius: 6px;
       }
     `;
     document.head.appendChild(style);
@@ -198,44 +176,6 @@
     });
   }
 
-  function requestJson(url) {
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: 'GET',
-        url,
-        responseType: 'json',
-        timeout: 15000,
-        onload: (response) => {
-          if (response.status < 200 || response.status >= 300) {
-            reject(new Error(`HTTP ${response.status}`));
-            return;
-          }
-
-          if (response.response && typeof response.response === 'object') {
-            resolve(response.response);
-            return;
-          }
-
-          try {
-            resolve(JSON.parse(response.responseText));
-          } catch (error) {
-            reject(error);
-          }
-        },
-        onerror: () => reject(new Error('接口请求失败')),
-        ontimeout: () => reject(new Error('接口请求超时'))
-      });
-    });
-  }
-
-  async function getApiUrls(dynamicId) {
-    if (!/^\d+$/.test(dynamicId || '')) return [];
-
-    const url = `${DETAIL_API}?id=${dynamicId}&timezone_offset=-480&features=itemOpusStyle`;
-    const json = await requestJson(url);
-    return json && json.code === 0 ? extractUrlsFromText(JSON.stringify(json.data)) : [];
-  }
-
   function setButtonState(button, text, color) {
     button.textContent = text;
     if (color) button.style.background = color;
@@ -250,15 +190,9 @@
 
     try {
       setButtonState(button, '读取图片', '#f69');
-      const dynamicId = getDynamicId(root);
-      const apiUrls = await getApiUrls(dynamicId).catch((error) => {
-        console.warn('[bilibili-originals] detail api skipped', error);
-        return [];
-      });
       const urls = dedupeUrls([
         ...getElementUrls(root),
-        ...(isDetailPage() ? getDocumentDataUrls() : []),
-        ...apiUrls
+        ...getDocumentDataUrls()
       ]);
 
       if (!urls.length) {
@@ -319,44 +253,14 @@
     const button = document.createElement('button');
     button.id = BUTTON_ID;
     button.type = 'button';
-    button.textContent = '原图 ZIP';
+    button.textContent = '下载原图 ZIP';
     button.addEventListener('click', () => downloadZip(findDetailRoot(), button));
     document.body.appendChild(button);
-  }
-
-  function isNestedCard(candidate) {
-    return CARD_SELECTORS.some((selector) => {
-      const parent = candidate.parentElement ? candidate.parentElement.closest(selector) : null;
-      return parent && parent !== candidate;
-    });
-  }
-
-  function ensureCardButtons() {
-    if (isDetailPage()) return;
-
-    for (const selector of CARD_SELECTORS) {
-      for (const card of document.querySelectorAll(selector)) {
-        if (card.querySelector(`.${BUTTON_CLASS}`) || isNestedCard(card) || !getElementUrls(card).length) continue;
-        if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
-
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = BUTTON_CLASS;
-        button.textContent = '原图 ZIP';
-        button.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          downloadZip(card, button);
-        });
-        card.appendChild(button);
-      }
-    }
   }
 
   function scan() {
     installStyle();
     ensureFixedButton();
-    ensureCardButtons();
   }
 
   function debounce(fn, delay) {
