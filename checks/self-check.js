@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const {
   cleanImageUrl,
   dedupeUrls,
+  extractInitialStateAlbumUrls,
   extractUrlsFromText,
   imageExtension,
   isContentImageUrl
@@ -34,6 +35,14 @@ assert.deepEqual(
     'https://i0.hdslb.com/bfs/new_dyn/keep.webp?foo=1'
   ]),
   ['https://i0.hdslb.com/bfs/new_dyn/keep.webp']
+);
+assert.deepEqual(
+  extractInitialStateAlbumUrls('window.__INITIAL_STATE__={"detail":{"modules":[{"module_top":{"display":{"album":{"pics":[{"url":"http:\\/\\/i0.hdslb.com\\/bfs\\/new_dyn\\/album.jpg@80w","width":4284}]}}}}]}};(function(){})'),
+  ['https://i0.hdslb.com/bfs/new_dyn/album.jpg']
+);
+assert.deepEqual(
+  extractInitialStateAlbumUrls('<img src="//i0.hdslb.com/bfs/new_dyn/thumb.jpg@80w_80h_1c">'),
+  []
 );
 
 console.log('self-check ok');

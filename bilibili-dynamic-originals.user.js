@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.1.0
+// @version      7.1.1
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -10,6 +10,9 @@
 // @grant        GM_xmlhttpRequest
 // @connect      hdslb.com
 // @connect      *.hdslb.com
+// @connect      i0.hdslb.com
+// @connect      i1.hdslb.com
+// @connect      i2.hdslb.com
 // @connect      biliimg.com
 // @connect      *.biliimg.com
 // @run-at       document-idle
@@ -76,8 +79,28 @@
     return dedupeUrls(normalized.match(/(?:https?:)?\/\/[^"'<>\s\\]+\/bfs\/[^"'<>\s\\,}\]]+/g) || []);
   }
 
+  function extractInitialStateAlbumUrls(text) {
+    const match = String(text || '').match(/window\.__INITIAL_STATE__=(.*?);\(function/);
+    if (!match) return [];
+
+    try {
+      const state = JSON.parse(match[1]);
+      const modules = state && state.detail && Array.isArray(state.detail.modules) ? state.detail.modules : [];
+      const urls = modules.flatMap((module) => {
+        const pics = module && module.module_top && module.module_top.display && module.module_top.display.album
+          ? module.module_top.display.album.pics
+          : [];
+        return Array.isArray(pics) ? pics.map((pic) => pic && pic.url) : [];
+      });
+      return dedupeUrls(urls);
+    } catch (error) {
+      console.warn('[bilibili-originals] initial state parse failed', error);
+      return [];
+    }
+  }
+
   if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-    module.exports = { cleanImageUrl, dedupeUrls, extractUrlsFromText, imageExtension, isContentImageUrl };
+    module.exports = { cleanImageUrl, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl };
     return;
   }
 
@@ -139,7 +162,8 @@
   }
 
   function getDocumentDataUrls() {
-    return dedupeUrls(Array.from(document.scripts, (script) => extractUrlsFromText(script.textContent)).flat());
+    const scripts = Array.from(document.scripts, (script) => script.textContent).join('\n');
+    return extractInitialStateAlbumUrls(scripts);
   }
 
   function getDynamicId(root) {
@@ -156,7 +180,14 @@
     return new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
   }
 
-  function requestBuffer(url) {
+  async function requestBuffer(url) {
+    try {
+      const response = await fetch(url, { credentials: 'omit', referrer: location.href });
+      if (response.ok) return await response.arrayBuffer();
+    } catch (error) {
+      console.warn('[bilibili-originals] fetch failed, trying GM_xmlhttpRequest', url, error);
+    }
+
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
         method: 'GET',
@@ -170,7 +201,7 @@
           }
           reject(new Error(`HTTP ${response.status}`));
         },
-        onerror: () => reject(new Error('网络请求失败')),
+        onerror: () => reject(new Error(`网络请求失败: ${url}`)),
         ontimeout: () => reject(new Error('请求超时'))
       });
     });
@@ -190,10 +221,8 @@
 
     try {
       setButtonState(button, '读取图片', '#f69');
-      const urls = dedupeUrls([
-        ...getElementUrls(root),
-        ...getDocumentDataUrls()
-      ]);
+      const dataUrls = getDocumentDataUrls();
+      const urls = dataUrls.length ? dataUrls : getElementUrls(root);
 
       if (!urls.length) {
         alert('没有找到这条动态里的原图。先展开图片或滚动到图片加载出来，再点一次。');
