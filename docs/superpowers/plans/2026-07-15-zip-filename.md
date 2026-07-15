@@ -207,7 +207,7 @@ git diff -- bilibili-dynamic-originals.user.js checks/self-check.js
 
 Expected: only version, metadata/filename helpers, filename integration, exports, and focused assertions changed. No API, dependency, UI, image-selection, ZIP implementation, or unrelated formatting changes.
 
-- [ ] **Step 7: Verify the real download in Twinkstar**
+- [x] **Step 7: Verify the real download in Twinkstar**
 
 On a real `https://www.bilibili.com/opus/<id>` page in Twinkstar:
 
