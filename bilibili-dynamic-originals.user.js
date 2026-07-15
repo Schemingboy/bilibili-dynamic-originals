@@ -151,15 +151,19 @@
   function parsePublishedAt(value) {
     const timestamp = Number(value);
     if (Number.isFinite(timestamp) && timestamp > 0) return timestamp > 1e12 ? Math.floor(timestamp / 1000) : timestamp;
-    const match = String(value || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})/);
-    if (!match) return 0;
-    return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]) - 8, Number(match[5])) / 1000;
+    const text = String(value || '');
+    const match = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})/);
+    if (match) return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]) - 8, Number(match[5])) / 1000;
+    const parsed = Date.parse(text);
+    return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
   }
 
   function formatPublishedAt(seconds) {
     const timestamp = parsePublishedAt(seconds);
     if (!timestamp) return '';
-    const value = new Date((timestamp + 8 * 60 * 60) * 1000).toISOString();
+    const date = new Date((timestamp + 8 * 60 * 60) * 1000);
+    if (!Number.isFinite(date.getTime())) return '';
+    const value = date.toISOString();
     return `${value.slice(0, 10)}_${value.slice(11, 16).replace(':', '')}`;
   }
 

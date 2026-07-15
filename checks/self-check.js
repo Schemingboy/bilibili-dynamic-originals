@@ -93,6 +93,7 @@ assert.deepEqual(
   { author: '新版UP主', publishedAt: 1782575247, title: '正文第一行😀' }
 );
 assert.equal(parsePublishedAt('2026年06月27日 23:47'), 1782575220);
+assert.equal(parsePublishedAt('2026-07-15T10:02:00+08:00'), 1784080920);
 assert.equal(
   buildZipFilename(
     { author: '测试/UP主', publishedAt: 1752582960, title: '  正式：标题?  ' },
@@ -108,6 +109,10 @@ assert.equal(
   `2025-07-15_2036_${'😀'.repeat(30)}_标题${'好'.repeat(38)}_123.zip`
 );
 assert.equal(buildZipFilename({ author: '', publishedAt: 0, title: '' }, '123'), 'bilibili-dynamic-123.zip');
+assert.equal(
+  buildZipFilename({ author: 'UP主', publishedAt: Number.MAX_VALUE, title: '标题' }, '123'),
+  'bilibili-dynamic-123.zip'
+);
 
 (async () => {
   const blob = createZipBlob([{ name: 'hello.txt', data: new TextEncoder().encode('hello') }]);
