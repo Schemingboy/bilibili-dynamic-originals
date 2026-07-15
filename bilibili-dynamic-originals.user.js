@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 动态原图打包下载
 // @namespace    https://github.com/gragon-local/bilibili-dynamic-originals
-// @version      7.2.0
+// @version      7.3.0
 // @description  在 Bilibili 单条动态/opus 页面中，一键把本条动态图片原图打包为 ZIP。
 // @author       Gragon + Codex
 // @match        https://t.bilibili.com/*
@@ -24,7 +24,7 @@
   const BUTTON_ID = 'bili-originals-fixed-button';
   const LINK_ID = 'bili-originals-download-link';
   const STYLE_ID = 'bili-originals-style';
-  const SCRIPT_VERSION = '7.2.0';
+  const SCRIPT_VERSION = '7.3.0';
   const DETAIL_SELECTORS = [
     '.opus-detail',
     '.opus-module-content',
@@ -81,24 +81,95 @@
     return dedupeUrls(normalized.match(/(?:https?:)?\/\/[^"'<>\s\\]+\/bfs\/[^"'<>\s\\,}\]]+/g) || []);
   }
 
-  function extractInitialStateAlbumUrls(text) {
+  function initialStateFromText(text) {
     const match = String(text || '').match(/window\.__INITIAL_STATE__=(.*?);\(function/);
-    if (!match) return [];
+    if (!match) return null;
 
     try {
-      const state = JSON.parse(match[1]);
-      const modules = state && state.detail && Array.isArray(state.detail.modules) ? state.detail.modules : [];
-      const urls = modules.flatMap((module) => {
-        const pics = module && module.module_top && module.module_top.display && module.module_top.display.album
-          ? module.module_top.display.album.pics
-          : [];
-        return Array.isArray(pics) ? pics.map((pic) => pic && pic.url) : [];
-      });
-      return dedupeUrls(urls);
-    } catch (error) {
-      console.warn('[bilibili-originals] initial state parse failed', error);
-      return [];
+      return JSON.parse(match[1]);
+    } catch (_) {
+      return null;
     }
+  }
+
+  function initialStateModules(value) {
+    const state = typeof value === 'string' ? initialStateFromText(value) : value;
+    return state && state.detail && Array.isArray(state.detail.modules) ? state.detail.modules : [];
+  }
+
+  function firstLine(value) {
+    return String(value || '').split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
+  }
+
+  function contentFirstLine(content) {
+    if (!content || !Array.isArray(content.paragraphs)) return '';
+    for (const paragraph of content.paragraphs) {
+      const nodes = paragraph && paragraph.text && Array.isArray(paragraph.text.nodes) ? paragraph.text.nodes : [];
+      const line = firstLine(nodes.map((node) => (
+        (node.word && node.word.words)
+        || (node.rich && node.rich.type !== 'RICH_TEXT_NODE_TYPE_EMOJI' && node.rich.text) || ''
+      )).join(''));
+      if (line) return line;
+    }
+    return '';
+  }
+
+  function extractInitialStateMetadata(value) {
+    const modules = initialStateModules(value);
+    const author = (modules.find((module) => module && module.module_author) || {}).module_author || {};
+    const dynamic = (modules.find((module) => module && module.module_dynamic) || {}).module_dynamic || {};
+    const titleModule = (modules.find((module) => module && module.module_title) || {}).module_title || {};
+    const content = (modules.find((module) => module && module.module_content) || {}).module_content;
+    const opus = dynamic.major && dynamic.major.opus ? dynamic.major.opus : {};
+    return {
+      author: author.name || '',
+      publishedAt: Number(author.pub_ts) || 0,
+      title: firstLine(titleModule.text || titleModule.title || opus.title || (dynamic.desc && dynamic.desc.text)
+        || (opus.summary && opus.summary.text) || contentFirstLine(content))
+    };
+  }
+
+  function extractInitialStateAlbumUrls(text) {
+    const urls = initialStateModules(text).flatMap((module) => {
+      const pics = module && module.module_top && module.module_top.display && module.module_top.display.album
+        ? module.module_top.display.album.pics
+        : [];
+      return Array.isArray(pics) ? pics.map((pic) => pic && pic.url) : [];
+    });
+    return dedupeUrls(urls);
+  }
+
+  function cleanFilenamePart(value, maxLength) {
+    const cleaned = String(value || '')
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[. ]+$/g, '');
+    return [...cleaned].slice(0, maxLength).join('').replace(/[. ]+$/g, '');
+  }
+
+  function parsePublishedAt(value) {
+    const timestamp = Number(value);
+    if (Number.isFinite(timestamp) && timestamp > 0) return timestamp > 1e12 ? Math.floor(timestamp / 1000) : timestamp;
+    const match = String(value || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})/);
+    if (!match) return 0;
+    return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]) - 8, Number(match[5])) / 1000;
+  }
+
+  function formatPublishedAt(seconds) {
+    const timestamp = parsePublishedAt(seconds);
+    if (!timestamp) return '';
+    const value = new Date((timestamp + 8 * 60 * 60) * 1000).toISOString();
+    return `${value.slice(0, 10)}_${value.slice(11, 16).replace(':', '')}`;
+  }
+
+  function buildZipFilename(metadata, dynamicId) {
+    const id = String(dynamicId || '');
+    const time = formatPublishedAt(metadata && metadata.publishedAt);
+    const author = cleanFilenamePart(metadata && metadata.author, 30);
+    const title = cleanFilenamePart(metadata && metadata.title, 40);
+    if (!time || !author || !title) return `bilibili-dynamic-${id}.zip`;
+    return `${time}_${author}_${title}_${id}.zip`;
   }
 
   function shouldRebuildButton(existingVersion, currentVersion) {
@@ -167,7 +238,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-    module.exports = { cleanImageUrl, createZipBlob, crc32, dedupeUrls, extractInitialStateAlbumUrls, extractUrlsFromText, imageExtension, isContentImageUrl, shouldRebuildButton };
+    module.exports = { buildZipFilename, cleanImageUrl, createZipBlob, crc32, dedupeUrls, extractInitialStateAlbumUrls, extractInitialStateMetadata, extractUrlsFromText, imageExtension, isContentImageUrl, parsePublishedAt, shouldRebuildButton };
     return;
   }
 
@@ -246,6 +317,22 @@
   function getDocumentDataUrls() {
     const scripts = Array.from(document.scripts, (script) => script.textContent).join('\n');
     return extractInitialStateAlbumUrls(scripts);
+  }
+
+  function getDynamicMetadata(root) {
+    const scripts = Array.from(document.scripts, (script) => script.textContent).join('\n');
+    const metadata = extractInitialStateMetadata(window.__INITIAL_STATE__ || scripts);
+    const authorElement = root.querySelector('.opus-module-author__name, .bili-dyn-title__text, a[href*="space.bilibili.com"]');
+    const timeElement = root.querySelector('time[datetime], .opus-module-author__pub__text, .bili-dyn-time');
+    const titleElement = root.querySelector('.opus-module-title, .opus-module-content__title, .opus-module-content, .bili-rich-text__content');
+    return {
+      author: metadata.author || (authorElement && authorElement.textContent.trim()) || '',
+      publishedAt: metadata.publishedAt || parsePublishedAt(timeElement && (
+        (timeElement.dataset && timeElement.dataset.timestamp) || timeElement.getAttribute('datetime')
+        || timeElement.getAttribute('title') || timeElement.textContent
+      )),
+      title: metadata.title || firstLine(titleElement && titleElement.textContent)
+    };
   }
 
   function getDynamicId(root) {
@@ -361,7 +448,8 @@
 
       setButtonState(button, '生成 ZIP', '#fa8c16');
       const blob = createZipBlob(files);
-      showDownloadLink(blob, `bilibili-dynamic-${getDynamicId(root)}.zip`);
+      const dynamicId = getDynamicId(root);
+      showDownloadLink(blob, buildZipFilename(getDynamicMetadata(root), dynamicId));
 
       setButtonState(button, failedUrls.length ? `完成 ${urls.length - failedUrls.length}/${urls.length}` : '完成', '#18a058');
     } catch (error) {
