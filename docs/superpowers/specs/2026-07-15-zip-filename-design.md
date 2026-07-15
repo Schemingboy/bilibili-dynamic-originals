@@ -5,7 +5,7 @@ modified: 2026-07-15
 tags:
   - bilibili
   - userscript
-status: review
+status: stable
 ---
 
 # Bilibili 动态 ZIP 文件名设计

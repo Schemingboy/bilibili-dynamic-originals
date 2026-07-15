@@ -41,7 +41,7 @@
   - `buildZipFilename(metadata: object, dynamicId: string): string`
   - runtime metadata resolution from page data first and the current detail root second.
 
-- [ ] **Step 1: Write failing checks for initial-state metadata and filename rules**
+- [x] **Step 1: Write failing checks for initial-state metadata and filename rules**
 
 Add `buildZipFilename` and `extractInitialStateMetadata` to the existing import in `checks/self-check.js`, then add these assertions before the ZIP blob check:
 
@@ -81,7 +81,7 @@ assert.equal(
 assert.equal(buildZipFilename({ author: '', publishedAt: 0, title: '' }, '123'), 'bilibili-dynamic-123.zip');
 ```
 
-- [ ] **Step 2: Run the self-check and verify RED**
+- [x] **Step 2: Run the self-check and verify RED**
 
 Run:
 
@@ -91,7 +91,7 @@ node .\checks\self-check.js
 
 Expected: FAIL because `extractInitialStateMetadata` and `buildZipFilename` do not exist or are not exported.
 
-- [ ] **Step 3: Implement the minimum pure helpers**
+- [x] **Step 3: Implement the minimum pure helpers**
 
 In `bilibili-dynamic-originals.user.js`, add pure helpers near `extractInitialStateAlbumUrls`:
 
@@ -156,7 +156,7 @@ function buildZipFilename(metadata, dynamicId) {
 
 Update `extractInitialStateAlbumUrls(text)` to call `initialStateModules(text)` instead of parsing the same state independently.
 
-- [ ] **Step 4: Add DOM fallback and connect the shared filename**
+- [x] **Step 4: Add DOM fallback and connect the shared filename**
 
 Add one runtime helper after `getDocumentDataUrls()`:
 
@@ -185,7 +185,7 @@ showDownloadLink(blob, filename);
 
 Export `buildZipFilename` and `extractInitialStateMetadata` in the existing Node export guard. Change both `@version` and `SCRIPT_VERSION` to `7.3.0`.
 
-- [ ] **Step 5: Run local verification and verify GREEN**
+- [x] **Step 5: Run local verification and verify GREEN**
 
 Run:
 
@@ -196,7 +196,7 @@ node .\checks\self-check.js
 
 Expected: exit code `0` and output `self-check ok`.
 
-- [ ] **Step 6: Inspect the diff against the approved scope**
+- [x] **Step 6: Inspect the diff against the approved scope**
 
 Run:
 
@@ -219,7 +219,7 @@ On a real `https://www.bilibili.com/opus/<id>` page in Twinkstar:
 
 Expected: automatic save succeeds with the descriptive filename, the fallback link matches, and ZIP contents are unchanged.
 
-- [ ] **Step 8: Commit the verified feature**
+- [x] **Step 8: Commit the verified feature**
 
 Run:
 
